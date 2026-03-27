@@ -74,14 +74,30 @@ function renderPage(num) {
 
     // Extract text
     page.getTextContent().then(function(textContent) {
-      const textItems = textContent.items;
-      
-      canvas.addEventListener("click", function() {
-        const randomWord = textItems[Math.floor(Math.random() * textItems.length)].str;
-        showMeaning(randomWord);
-      });
+  const textItems = textContent.items;
+
+  canvas.addEventListener("click", function(e) {
+    const x = e.offsetX;
+    const y = e.offsetY;
+
+    textItems.forEach(item => {
+      const tx = item.transform[4];
+      const ty = item.transform[5];
+      const width = item.width;
+      const height = item.height;
+
+      if (
+        x >= tx &&
+        x <= tx + width &&
+        y >= ty - height &&
+        y <= ty
+      ) {
+        showMeaning(item.str);
+      }
     });
   });
+});
+ }); 
 }
 
 function showMeaning(word) {
@@ -95,11 +111,41 @@ function showMeaning(word) {
       } catch {}
 
       const popup = document.getElementById("popup");
-      popup.innerHTML = `<b>${word}</b>: ${meaning}`;
+      popup.innerHTML = `
+        <h3>${word}</h3>
+        <p>${meaning}</p>
+        <button onclick="saveWord('${word}', '${meaning}')">Save</button>
+      `;
       popup.style.display = "block";
     });
 }
-</script>
 
+  // vocabulary memory 
+  function saveWord(word, meaning) {
+  let words = JSON.parse(localStorage.getItem("vocab")) || [];
+
+  words.push({ word, meaning });
+
+  localStorage.setItem("vocab", JSON.stringify(words));
+
+  alert("Saved!");
+    }
+</script>
+  
+  <button onclick="showSaved()">View Saved Words</button>
+
+  <script>
+    // saved words
+  function showSaved() {
+  let words = JSON.parse(localStorage.getItem("vocab")) || [];
+
+  let list = words.map(w => `<li><b>${w.word}</b>: ${w.meaning}</li>`).join("");
+
+  const popup = document.getElementById("popup");
+  popup.innerHTML = `<ul>${list}</ul>`;
+  popup.style.display = "block";
+  }
+</script>
+  
 </body>
 </html>
