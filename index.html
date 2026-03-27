@@ -90,54 +90,55 @@ document.getElementById('upload').addEventListener('change', function(e) {
 });
 
 // render
-function renderAllPages() {
-  const container = document.getElementById("pdf-container");
-  container.innerHTML = "";
 
-  for (let i = 1; i <= pdfDoc.numPages; i++) {
-    pdfDoc.getPage(i).then(function(page) {
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-
-      const viewport = page.getViewport({ scale: 1.5 });
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
-
-      container.appendChild(canvas);
-
-      page.render({
+async function renderPageToCanvas(page) {
+    const container = document.getElementById("pdf-container");
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const viewport = page.getViewport({ scale: 1.5 });
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+    container.appendChild(canvas);
+    await page.render({
         canvasContext: ctx,
         viewport: viewport
-      });
-
-      // Extract text
-      page.getTextContent().then(function(textContent) {
-        const textItems = textContent.items;
-
-        canvas.addEventListener("click", function(e) {
-          const x = e.offsetX;
-          const y = e.offsetY;
-
-          textItems.forEach(item => {
+    }).promise;
+    // Extract text
+    const textContent = await page.getTextContent();
+    const textItems = textContent.items;
+    canvas.addEventListener("click", function(e) {
+        const x = e.offsetX;
+        const y = e.offsetY;
+        textItems.forEach(item => {
             const tx = item.transform[4];
             const ty = item.transform[5];
             const width = item.width;
             const height = item.height;
-
             if (
-              x >= tx &&
-              x <= tx + width &&
-              y >= ty - height &&
-              y <= ty
+                x >= tx &&
+                x <= tx + width &&
+                y >= ty - height &&
+                y <= ty
             ) {
-              showMeaning(item.str);
+                showMeaning(item.str);
             }
-          });
         });
-      });
     });
-  }
-} 
+}
+
+async function renderAllPages() {
+  const container = document.getElementById("pdf-container");
+  const renderedPages = [];
+  // Render pages sequentially
+  const renderPage = async (index) => {
+    if (index < pdfDoc.numPages) {
+      const page = await pdfDoc.getPage(index + 1);
+      await renderPageToCanvas(page);
+      renderedPages.push(page);
+      await renderPage(index + 1);
+    }
+  };
+  renderPage(0);
 }
 
 function showMeaning(word) {
