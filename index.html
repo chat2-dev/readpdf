@@ -300,68 +300,62 @@ function showOCRStatus(message, duration = 0) {
 }
 
 function setupCanvasClickHandler(canvas, highlightCanvas, viewport, textItems) {
-    // Add click handler to both canvases to ensure proper detection
-    const clickHandler = function(e) {
+    canvas.addEventListener("click", function (e) {
         const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+
+        // Get mouse click coordinates relative to canvas dimensions
+        const x = (e.clientX - rect.left) * (canvas.width / rect.width); // Scale click to canvas resolution
         const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-        
-        console.log("🖱️ Clicked at canvas position:", { x, y });
-        console.log("📊 Canvas size:", { width: canvas.width, height: canvas.height });
-        console.log("📊 Overlay size:", { width: highlightCanvas.width, height: highlightCanvas.height });
-        
-        let foundWord = false;
-        textItems.forEach(item => {
-            const tx = item.transform[4];  // X position in PDF coordinates
-            const ty = item.transform[5];  // Y baseline position in PDF coordinates
-            const width = item.width;
-            const height = item.height;
-            
+
+        console.log(`🖱️ Clicked at canvas X:${x}, Y:${y}`);
+
+        const hCtx = highlightCanvas.getContext("2d");
+        hCtx.clearRect(0, 0, highlightCanvas.width, highlightCanvas.height); // Clear previous highlights
+
+        let found = false;
+
+        // Check each word's coordinates
+        textItems.forEach((item) => {
+            const tx = item.transform[4]; // Word's X coordinate
+            const ty = item.transform[5]; // Word's baseline Y coordinate
+            const width = item.width; // Width of the word
+            const height = item.height; // Height of the word
+
             // Convert PDF coordinates to canvas coordinates
-            // In PDF: (0,0) is bottom-left, Y increases upward
-            // In Canvas: (0,0) is top-left, Y increases downward
+            // PDF: (0,0) bottom-left, Y increases upward
+            // Canvas: (0,0) top-left, Y increases downward
             const canvasX = tx;
-            const canvasYTop = viewport.height - (ty + height);  // Top of text in canvas coords
-            const canvasYBottom = viewport.height - ty;  // Bottom of text in canvas coords
-            
-            console.log(`Checking word "${item.str}": PDF coords (${tx}, ${ty}), Canvas coords (${canvasX}, ${canvasYTop})`);
-            
-            if (
-                x >= canvasX &&
-                x <= canvasX + width &&
-                y >= canvasYTop &&
-                y <= canvasYBottom
-            ) {
-                foundWord = true;
-                console.log("✨ Word detected:", item.str);
-                
-                // Clear previous highlights
-                const hCtx = highlightCanvas.getContext("2d");
-                hCtx.clearRect(0, 0, highlightCanvas.width, highlightCanvas.height);
-                
-                // Draw blue highlight box - use canvas coordinates directly
-                hCtx.fillStyle = "rgba(0, 150, 255, 0.3)";
+            const canvasYTop = viewport.height - (ty + height); // Top of text in canvas coords
+            const canvasYBottom = viewport.height - ty; // Bottom of text in canvas coords
+
+            console.log(`Checking word "${item.str}": PDF(${tx},${ty}) -> Canvas(${canvasX},${canvasYTop})`);
+
+            // Check if click is within word's bounding box
+            if (x >= canvasX && x <= canvasX + width && y >= canvasYTop && y <= canvasYBottom) {
+                console.log("✨ Highlighting word:", item.str);
+
+                // Draw the highlight box using correct canvas coordinates
+                hCtx.fillStyle = "rgba(0, 150, 255, 0.3)"; // Transparent blue
+                hCtx.strokeStyle = "rgba(0, 150, 255, 0.9)"; // Darker blue border
+                hCtx.lineWidth = 2;
+
+                // Draw at canvas coordinates (no conversion needed)
                 hCtx.fillRect(canvasX, canvasYTop, width, height);
-                hCtx.strokeStyle = "rgba(0, 150, 255, 0.9)";
-                hCtx.lineWidth = 3;
                 hCtx.strokeRect(canvasX, canvasYTop, width, height);
-                
-                console.log("🎨 Blue highlight drawn at:", { x: canvasX, y: canvasYTop, width, height });
-                console.log("✅ Highlight canvas updated successfully");
-                
-                // Fetch definition
+
+                console.log(`🎨 Highlight at X:${canvasX} Y:${canvasYTop} W:${width} H:${height}`);
+
+                found = true;
+
+                // Fetch word definition
                 showMeaning(item.str);
             }
         });
-        
-        if (!foundWord) {
-            console.log("⚠️ No word found at clicked position");
+
+        if (!found) {
+            console.log("⚠️ No word found at clicked position.");
         }
-    };
-    
-    // Listen to clicks on both the main canvas and the highlight canvas
-    canvas.addEventListener("click", clickHandler);
-    highlightCanvas.addEventListener("click", clickHandler);
+    });
 }
 
 async function renderAllPages() {
