@@ -9,6 +9,16 @@
       font-family: Arial;
       padding: 10px;
     }
+
+    #pdf-container {
+  height: 80vh;
+  overflow-y: scroll;
+  border: 1px solid #ccc;
+}
+
+
+  
+}
     canvas {
       width: 100%;
       border: 1px solid #ccc;
@@ -32,7 +42,10 @@
 <h3>Upload PDF</h3>
 <input type="file" id="upload" accept="application/pdf">
 
-<canvas id="pdf-render"></canvas>
+
+  <div id="pdf-container">
+  <canvas id="pdf-render"></canvas>
+</div>
 
 <div id="popup"></div>
 
@@ -56,22 +69,29 @@ document.getElementById('upload').addEventListener('change', function(e) {
   fileReader.readAsArrayBuffer(file);
 });
 
-function renderPage(num) {
-  pdfDoc.getPage(num).then(function(page) {
-    const canvas = document.getElementById('pdf-render');
-    const ctx = canvas.getContext('2d');
 
-    const viewport = page.getViewport({ scale: 1.5 });
-    canvas.height = viewport.height;
-    canvas.width = viewport.width;
+function renderAllPages() {
+  const container = document.getElementById("pdf-container");
+  container.innerHTML = "";
 
-    const renderContext = {
-      canvasContext: ctx,
-      viewport: viewport
-    };
+  for (let i = 1; i <= pdfDoc.numPages; i++) {
+    pdfDoc.getPage(i).then(function(page) {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
 
-    page.render(renderContext);
+      const viewport = page.getViewport({ scale: 1.5 });
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
 
+      container.appendChild(canvas);
+
+      page.render({
+        canvasContext: ctx,
+        viewport: viewport
+      });
+    });
+  }
+}
     // Extract text
     page.getTextContent().then(function(textContent) {
   const textItems = textContent.items;
