@@ -257,25 +257,33 @@ function parseOCRResults(lines, viewport) {
         if (line.words) {
             line.words.forEach((word) => {
                 if (word.text && word.text.trim()) {
-                    // Extract bounding box info
+                    // Extract bounding box info from Tesseract
                     const bbox = word.bbox;
                     const x0 = bbox.x0;
                     const y0 = bbox.y0;
                     const x1 = bbox.x1;
                     const y1 = bbox.y1;
                     
-                    // Convert to pdf.js format
+                    // Convert Tesseract coordinates to PDF.js format
+                    // Tesseract: (0,0) is top-left, Y increases downward
+                    // PDF.js: (0,0) is bottom-left, Y increases upward
+                    const pdfX = x0;
+                    const pdfY = viewport.height - y1;  // Convert to PDF baseline coordinate
+                    
                     textItems.push({
                         str: word.text,
                         width: x1 - x0,
                         height: y1 - y0,
-                        transform: [1, 0, 0, 1, x0, viewport.height - y1]
+                        transform: [1, 0, 0, 1, pdfX, pdfY]
                     });
+                    
+                    console.log(`📝 OCR word "${word.text}" at PDF coords (${pdfX}, ${pdfY}), size ${x1 - x0}x${y1 - y0}`);
                 }
             });
         }
     });
     
+    console.log(`📊 Total OCR text items: ${textItems.length}`);
     return textItems;
 }
 
@@ -304,20 +312,25 @@ function setupCanvasClickHandler(canvas, highlightCanvas, viewport, textItems) {
         
         let foundWord = false;
         textItems.forEach(item => {
-            const tx = item.transform[4];
-            const ty = item.transform[5];
+            const tx = item.transform[4];  // X position in PDF coordinates
+            const ty = item.transform[5];  // Y baseline position in PDF coordinates
             const width = item.width;
             const height = item.height;
-            const canvasYBottom = viewport.height - ty;
-            const canvasYTop = canvasYBottom + height;
             
-            console.log(`Checking word "${item.str}": x[${tx}-${tx + width}], y[${canvasYBottom}-${canvasYTop}]`);
+            // Convert PDF coordinates to canvas coordinates
+            // In PDF: (0,0) is bottom-left, Y increases upward
+            // In Canvas: (0,0) is top-left, Y increases downward
+            const canvasX = tx;
+            const canvasYTop = viewport.height - (ty + height);  // Top of text in canvas coords
+            const canvasYBottom = viewport.height - ty;  // Bottom of text in canvas coords
+            
+            console.log(`Checking word "${item.str}": PDF coords (${tx}, ${ty}), Canvas coords (${canvasX}, ${canvasYTop})`);
             
             if (
-                x >= tx &&
-                x <= tx + width &&
-                y >= canvasYBottom &&
-                y <= canvasYTop
+                x >= canvasX &&
+                x <= canvasX + width &&
+                y >= canvasYTop &&
+                y <= canvasYBottom
             ) {
                 foundWord = true;
                 console.log("✨ Word detected:", item.str);
@@ -326,16 +339,14 @@ function setupCanvasClickHandler(canvas, highlightCanvas, viewport, textItems) {
                 const hCtx = highlightCanvas.getContext("2d");
                 hCtx.clearRect(0, 0, highlightCanvas.width, highlightCanvas.height);
                 
-                // Draw blue highlight box
-                const highlightX = tx;
-                const highlightY = viewport.height - canvasYTop;
+                // Draw blue highlight box - use canvas coordinates directly
                 hCtx.fillStyle = "rgba(0, 150, 255, 0.3)";
-                hCtx.fillRect(highlightX, highlightY, width, height);
+                hCtx.fillRect(canvasX, canvasYTop, width, height);
                 hCtx.strokeStyle = "rgba(0, 150, 255, 0.9)";
                 hCtx.lineWidth = 3;
-                hCtx.strokeRect(highlightX, highlightY, width, height);
+                hCtx.strokeRect(canvasX, canvasYTop, width, height);
                 
-                console.log("🎨 Blue highlight drawn at:", { highlightX, highlightY, width, height });
+                console.log("🎨 Blue highlight drawn at:", { x: canvasX, y: canvasYTop, width, height });
                 console.log("✅ Highlight canvas updated successfully");
                 
                 // Fetch definition
