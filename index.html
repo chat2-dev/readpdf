@@ -110,35 +110,35 @@ function renderAllPages() {
         canvasContext: ctx,
         viewport: viewport
       });
+
+      // Extract text
+      page.getTextContent().then(function(textContent) {
+        const textItems = textContent.items;
+
+        canvas.addEventListener("click", function(e) {
+          const x = e.offsetX;
+          const y = e.offsetY;
+
+          textItems.forEach(item => {
+            const tx = item.transform[4];
+            const ty = item.transform[5];
+            const width = item.width;
+            const height = item.height;
+
+            if (
+              x >= tx &&
+              x <= tx + width &&
+              y >= ty - height &&
+              y <= ty
+            ) {
+              showMeaning(item.str);
+            }
+          });
+        });
+      });
     });
   }
-}
-    // Extract text
-    page.getTextContent().then(function(textContent) {
-  const textItems = textContent.items;
-
-  canvas.addEventListener("click", function(e) {
-    const x = e.offsetX;
-    const y = e.offsetY;
-
-    textItems.forEach(item => {
-      const tx = item.transform[4];
-      const ty = item.transform[5];
-      const width = item.width;
-      const height = item.height;
-
-      if (
-        x >= tx &&
-        x <= tx + width &&
-        y >= ty - height &&
-        y <= ty
-      ) {
-        showMeaning(item.str);
-      }
-    });
-  });
-});
- }); 
+} 
 }
 
 function showMeaning(word) {
