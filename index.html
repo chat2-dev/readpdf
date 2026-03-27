@@ -32,6 +32,22 @@
       padding: 10px;
       border-radius: 10px;
       display: none;
+      z-index: 1000;
+    }
+    
+    .word-highlight {
+      position: absolute;
+      background: rgba(0, 150, 255, 0.3);
+      border: 2px solid rgba(0, 150, 255, 0.8);
+      pointer-events: none;
+      z-index: 100;
+    }
+    
+    .highlight-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 50;
     }
 
   </style>
@@ -98,17 +114,30 @@ async function renderPageToCanvas(page) {
     const viewport = page.getViewport({ scale: 1.5 });
     canvas.height = viewport.height;
     canvas.width = viewport.width;
+    
+    // Create highlight overlay canvas
+    const highlightCanvas = document.createElement("canvas");
+    highlightCanvas.className = "highlight-overlay";
+    highlightCanvas.width = canvas.width;
+    highlightCanvas.height = canvas.height;
+    
     container.appendChild(canvas);
+    container.appendChild(highlightCanvas);
+    
     await page.render({
         canvasContext: ctx,
         viewport: viewport
     }).promise;
+    
     // Extract text
     const textContent = await page.getTextContent();
     const textItems = textContent.items;
+    
     canvas.addEventListener("click", function(e) {
         const x = e.offsetX;
         const y = e.offsetY;
+        console.log("🖱️ Clicked at position:", { x, y });
+        
         textItems.forEach(item => {
             const tx = item.transform[4];
             const ty = item.transform[5];
@@ -116,12 +145,27 @@ async function renderPageToCanvas(page) {
             const height = item.height;
             const canvasYBottom = viewport.height - ty;
             const canvasYTop = canvasYBottom + height;
+            
             if (
                 x >= tx &&
                 x <= tx + width &&
                 y >= canvasYBottom &&
                 y <= canvasYTop
             ) {
+                console.log("✨ Word detected:", item.str);
+                
+                // Clear previous highlights
+                const hCtx = highlightCanvas.getContext("2d");
+                hCtx.clearRect(0, 0, highlightCanvas.width, highlightCanvas.height);
+                
+                // Draw blue highlight
+                hCtx.fillStyle = "rgba(0, 150, 255, 0.3)";
+                hCtx.fillRect(tx, viewport.height - canvasYTop, width, height);
+                hCtx.strokeStyle = "rgba(0, 150, 255, 0.8)";
+                hCtx.lineWidth = 2;
+                hCtx.strokeRect(tx, viewport.height - canvasYTop, width, height);
+                
+                // Fetch definition
                 showMeaning(item.str);
             }
         });
@@ -144,20 +188,56 @@ async function renderAllPages() {
 }
 
 function showMeaning(word) {
+  console.log("🔍 Fetching definition for:", word);
+  
+  const popup = document.getElementById("popup");
+  popup.innerHTML = `<p>Loading...</p>`;
+  popup.style.display = "block";
+  
   fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`)
-    .then(res => res.json())
+    .then(res => {
+      console.log("📡 API Response Status:", res.status);
+      if (!res.ok) {
+        throw new Error(`API Error: ${res.status} ${res.statusText}`);
+      }
+      return res.json();
+    })
     .then(data => {
+      console.log("📦 API Data Received:", data);
+      
+      // Check if data is an array and has content
+      if (!Array.isArray(data) || data.length === 0) {
+        throw new Error("Empty or invalid API response");
+      }
+
       let meaning = "No meaning found";
-
       try {
-        meaning = data[0].meanings[0].definitions[0].definition;
-      } catch {}
+        if (data[0].meanings && data[0].meanings.length > 0) {
+          const definitions = data[0].meanings[0].definitions;
+          if (definitions && definitions.length > 0) {
+            meaning = definitions[0].definition;
+          }
+        }
+      } catch (e) {
+        console.warn("⚠️ Error extracting meaning:", e);
+      }
 
-      const popup = document.getElementById("popup");
       popup.innerHTML = `
         <h3>${word}</h3>
         <p>${meaning}</p>
         <button onclick="saveWord('${word}', '${meaning}')">Save</button>
+        <button onclick="document.getElementById('popup').style.display='none'">Close</button>
+      `;
+      popup.style.display = "block";
+      console.log("✅ Popup displayed for:", word);
+    })
+    .catch(error => {
+      console.error("❌ Error fetching definition:", error);
+      popup.innerHTML = `
+        <h3>${word}</h3>
+        <p>❌ Error: ${error.message}</p>
+        <p>Could not fetch definition. Please try again.</p>
+        <button onclick="document.getElementById('popup').style.display='none'">Close</button>
       `;
       popup.style.display = "block";
     });
