@@ -114,11 +114,13 @@ async function renderPageToCanvas(page) {
             const ty = item.transform[5];
             const width = item.width;
             const height = item.height;
+            const canvasYBottom = viewport.height - ty;
+            const canvasYTop = canvasYBottom + height;
             if (
                 x >= tx &&
                 x <= tx + width &&
-                y >= ty - height &&
-                y <= ty
+                y >= canvasYBottom &&
+                y <= canvasYTop
             ) {
                 showMeaning(item.str);
             }
