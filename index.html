@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PDF Dictionary App</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <style>
+    body {
+      font-family: Arial;
+      padding: 10px;
+    }
+    canvas {
+      width: 100%;
+      border: 1px solid #ccc;
+      margin-top: 10px;
+    }
+    #popup {
+      position: fixed;
+      bottom: 20px;
+      left: 10px;
+      right: 10px;
+      background: black;
+      color: white;
+      padding: 10px;
+      border-radius: 10px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<h3>Upload PDF</h3>
+<input type="file" id="upload" accept="application/pdf">
+
+<canvas id="pdf-render"></canvas>
+
+<div id="popup"></div>
+
+<script>
+let pdfDoc = null;
+let pageNum = 1;
+
+document.getElementById('upload').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  const fileReader = new FileReader();
+
+  fileReader.onload = function() {
+    const typedarray = new Uint8Array(this.result);
+
+    pdfjsLib.getDocument(typedarray).promise.then(function(pdf) {
+      pdfDoc = pdf;
+      renderPage(pageNum);
+    });
+  };
+
+  fileReader.readAsArrayBuffer(file);
+});
+
+function renderPage(num) {
+  pdfDoc.getPage(num).then(function(page) {
+    const canvas = document.getElementById('pdf-render');
+    const ctx = canvas.getContext('2d');
+
+    const viewport = page.getViewport({ scale: 1.5 });
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+
+    const renderContext = {
+      canvasContext: ctx,
+      viewport: viewport
+    };
+
+    page.render(renderContext);
+
+    // Extract text
+    page.getTextContent().then(function(textContent) {
+      const textItems = textContent.items;
+      
+      canvas.addEventListener("click", function() {
+        const randomWord = textItems[Math.floor(Math.random() * textItems.length)].str;
+        showMeaning(randomWord);
+      });
+    });
+  });
+}
+
+function showMeaning(word) {
+  fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`)
+    .then(res => res.json())
+    .then(data => {
+      let meaning = "No meaning found";
+
+      try {
+        meaning = data[0].meanings[0].definitions[0].definition;
+      } catch {}
+
+      const popup = document.getElementById("popup");
+      popup.innerHTML = `<b>${word}</b>: ${meaning}`;
+      popup.style.display = "block";
+    });
+}
+</script>
+
+</body>
+</html>
