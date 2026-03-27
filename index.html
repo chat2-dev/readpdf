@@ -51,6 +51,11 @@
 
 <script>
   //database
+  
+  let pdfDoc = null; 
+let currentPDFData = null;
+let pageNum = 1;
+
   let db;
 
 let request = indexedDB.open("PDFDatabase", 1);
@@ -65,10 +70,7 @@ request.onsuccess = function(e) {
 };
 
   // choose file 
-  
-let currentPDFData = null;
-let pageNum = 1;
-
+ 
 document.getElementById('upload').addEventListener('change', function(e) {
   const file = e.target.files[0];
   const fileReader = new FileReader();
