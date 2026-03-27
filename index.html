@@ -160,8 +160,8 @@ async function renderPageToCanvas(page) {
     
     console.log("📝 Found text items:", textItems.length);
     
-    // If minimal text found, likely an image/scanned PDF - use OCR
-    if (textItems.length < 10) {
+    // Check if OCR is actually needed
+    if (needsOCR(textItems)) {
         console.log("🖼️ Image-based PDF detected, running OCR...");
         showOCRStatus("🔄 Running OCR on page...");
         
@@ -179,10 +179,48 @@ async function renderPageToCanvas(page) {
             console.error("❌ OCR Error:", error);
             showOCRStatus("⚠️ OCR failed, using regular text mode", 3000);
         }
+    } else {
+        console.log("✅ Readable PDF detected, using native text extraction");
     }
     
     // Add click handler for text detection
     setupCanvasClickHandler(canvas, highlightCanvas, viewport, textItems);
+}
+
+function needsOCR(textItems) {
+    // Threshold: if we have very few text items, likely an image
+    if (textItems.length < 3) {
+        return true;
+    }
+    
+    // Calculate total meaningful text length
+    let totalTextLength = 0;
+    let emptyItems = 0;
+    
+    textItems.forEach(item => {
+        const text = item.str.trim();
+        if (text.length === 0) {
+            emptyItems++;
+        } else {
+            totalTextLength += text.length;
+        }
+    });
+    
+    console.log(`📊 Text analysis - Items: ${textItems.length}, Meaningful text: ${totalTextLength} chars, Empty: ${emptyItems}`);
+    
+    // If we have decent text content (more than 50 meaningful characters), skip OCR
+    if (totalTextLength > 50) {
+        return false;
+    }
+    
+    // If more than 50% of items are empty/whitespace, likely needs OCR
+    const emptyRatio = emptyItems / textItems.length;
+    if (emptyRatio > 0.5) {
+        console.log(`⚠️ High empty ratio (${(emptyRatio * 100).toFixed(1)}%), needs OCR`);
+        return true;
+    }
+    
+    return false;
 }
 
 function parseOCRResults(lines, viewport) {
