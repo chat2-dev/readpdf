@@ -50,7 +50,23 @@
 <div id="popup"></div>
 
 <script>
-let pdfDoc = null;
+  //database
+  let db;
+
+let request = indexedDB.open("PDFDatabase", 1);
+
+request.onupgradeneeded = function(e) {
+  db = e.target.result;
+  db.createObjectStore("pdfs", { keyPath: "id" });
+};
+
+request.onsuccess = function(e) {
+  db = e.target.result;
+};
+
+  // choose file 
+  
+let currentPDFData = null;
 let pageNum = 1;
 
 document.getElementById('upload').addEventListener('change', function(e) {
@@ -58,18 +74,21 @@ document.getElementById('upload').addEventListener('change', function(e) {
   const fileReader = new FileReader();
 
   fileReader.onload = function() {
-    const typedarray = new Uint8Array(this.result);
+  const typedarray = new Uint8Array(this.result);
 
-    pdfjsLib.getDocument(typedarray).promise.then(function(pdf) {
-      pdfDoc = pdf;
-      renderPage(pageNum);
-    });
-  };
+  // 🔥 ADD THIS LINE (important)
+  currentPDFData = this.result;
+
+  pdfjsLib.getDocument(typedarray).promise.then(function(pdf) {
+    pdfDoc = pdf;
+    renderAllPages(); // also changed
+  });
+};
 
   fileReader.readAsArrayBuffer(file);
 });
 
-
+// render
 function renderAllPages() {
   const container = document.getElementById("pdf-container");
   container.innerHTML = "";
@@ -166,6 +185,63 @@ function showMeaning(word) {
   popup.style.display = "block";
   }
 </script>
+
+  <button onclick="savePDF()">Save PDF</button>
+<button onclick="loadPDF()">Load Saved PDF</button>
+<button onclick="deletePDF()">Delete PDF</button>
+<script>
+
+  //save
+  function savePDF() {
+  if (!currentPDFData) {
+    alert("No PDF loaded!");
+    return;
+  }
+
+  let tx = db.transaction("pdfs", "readwrite");
+  let store = tx.objectStore("pdfs");
+
+  store.put({
+    id: "myPDF",
+    data: currentPDFData
+  });
+
+  alert("PDF Saved!");
+  }
+
+  //load
+  function loadPDF() {
+  let tx = db.transaction("pdfs", "readonly");
+  let store = tx.objectStore("pdfs");
+
+  let req = store.get("myPDF");
+
+  req.onsuccess = function() {
+    if (!req.result) {
+      alert("No saved PDF!");
+      return;
+    }
+
+    let typedarray = new Uint8Array(req.result.data);
+
+    pdfjsLib.getDocument(typedarray).promise.then(function(pdf) {
+      pdfDoc = pdf;
+      renderAllPages();
+    });
+  };
+  }
+// deletePDF 
+
+  function deletePDF() {
+  let tx = db.transaction("pdfs", "readwrite");
+  let store = tx.objectStore("pdfs");
+
+  store.delete("myPDF");
+
+  alert("PDF Deleted!");
+  }
   
+</script>
+
 </body>
 </html>
