@@ -17,6 +17,8 @@
       display: block;
       border: 1px solid #ccc;
       margin-top: 10px;
+      margin: 0;
+      padding: 0;
     }
     #pdf-container {
        height:80vh;
@@ -41,6 +43,9 @@
     .page-wrapper {
       position: relative;
       margin-bottom: 10px;
+      margin: 0;
+      padding: 0;
+      width: fit-content;
     }
     
     .highlight-overlay {
@@ -49,6 +54,10 @@
       left: 0;
       z-index: 50;
       cursor: pointer;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: none !important;
+      display: block;
     }
     
     #ocr-status {
@@ -127,6 +136,9 @@ async function renderPageToCanvas(page) {
     // Create wrapper for positioning
     const pageWrapper = document.createElement("div");
     pageWrapper.className = "page-wrapper";
+    pageWrapper.style.margin = "0";
+    pageWrapper.style.padding = "0";
+    pageWrapper.style.marginTop = "10px";
     
     // Create main canvas for PDF rendering
     const canvas = document.createElement("canvas");
@@ -135,16 +147,31 @@ async function renderPageToCanvas(page) {
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     canvas.style.display = "block";
+    canvas.style.margin = "0";
+    canvas.style.padding = "0";
+    canvas.style.border = "1px solid #ccc";
     
-    // Create highlight overlay canvas
+    // Create highlight overlay canvas - MUST match main canvas exactly
     const highlightCanvas = document.createElement("canvas");
     highlightCanvas.className = "highlight-overlay";
-    highlightCanvas.width = viewport.width;
-    highlightCanvas.height = viewport.height;
+    highlightCanvas.width = viewport.width;  // Same width
+    highlightCanvas.height = viewport.height;  // Same height
+    highlightCanvas.style.position = "absolute";
+    highlightCanvas.style.top = "0px";
+    highlightCanvas.style.left = "0px";
+    highlightCanvas.style.margin = "0";
+    highlightCanvas.style.padding = "0";
+    highlightCanvas.style.border = "none";
+    highlightCanvas.style.display = "block";
+    highlightCanvas.style.zIndex = "50";
+    highlightCanvas.style.cursor = "pointer";
     
     pageWrapper.appendChild(canvas);
     pageWrapper.appendChild(highlightCanvas);
     container.appendChild(pageWrapper);
+    
+    console.log("🎨 Canvas dimensions - Width:", canvas.width, "Height:", canvas.height);
+    console.log("🎨 Overlay dimensions - Width:", highlightCanvas.width, "Height:", highlightCanvas.height);
     
     // Render PDF to canvas
     await page.render({
@@ -265,12 +292,15 @@ function showOCRStatus(message, duration = 0) {
 }
 
 function setupCanvasClickHandler(canvas, highlightCanvas, viewport, textItems) {
-    canvas.addEventListener("click", function(e) {
+    // Add click handler to both canvases to ensure proper detection
+    const clickHandler = function(e) {
         const rect = canvas.getBoundingClientRect();
         const x = (e.clientX - rect.left) * (canvas.width / rect.width);
         const y = (e.clientY - rect.top) * (canvas.height / rect.height);
         
         console.log("🖱️ Clicked at canvas position:", { x, y });
+        console.log("📊 Canvas size:", { width: canvas.width, height: canvas.height });
+        console.log("📊 Overlay size:", { width: highlightCanvas.width, height: highlightCanvas.height });
         
         let foundWord = false;
         textItems.forEach(item => {
@@ -306,6 +336,7 @@ function setupCanvasClickHandler(canvas, highlightCanvas, viewport, textItems) {
                 hCtx.strokeRect(highlightX, highlightY, width, height);
                 
                 console.log("🎨 Blue highlight drawn at:", { highlightX, highlightY, width, height });
+                console.log("✅ Highlight canvas updated successfully");
                 
                 // Fetch definition
                 showMeaning(item.str);
@@ -315,7 +346,11 @@ function setupCanvasClickHandler(canvas, highlightCanvas, viewport, textItems) {
         if (!foundWord) {
             console.log("⚠️ No word found at clicked position");
         }
-    });
+    };
+    
+    // Listen to clicks on both the main canvas and the highlight canvas
+    canvas.addEventListener("click", clickHandler);
+    highlightCanvas.addEventListener("click", clickHandler);
 }
 
 async function renderAllPages() {
