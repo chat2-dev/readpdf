@@ -13,7 +13,7 @@
 
 
     canvas {
-      width: 100%;
+      display: block;
       border: 1px solid #ccc;
       margin-top: 10px;
     }
@@ -29,18 +29,17 @@
       right: 10px;
       background: black;
       color: white;
-      padding: 10px;
+      padding: 15px;
       border-radius: 10px;
       display: none;
       z-index: 1000;
+      max-height: 200px;
+      overflow-y: auto;
     }
     
-    .word-highlight {
-      position: absolute;
-      background: rgba(0, 150, 255, 0.3);
-      border: 2px solid rgba(0, 150, 255, 0.8);
-      pointer-events: none;
-      z-index: 100;
+    .page-wrapper {
+      position: relative;
+      margin-bottom: 10px;
     }
     
     .highlight-overlay {
@@ -48,6 +47,7 @@
       top: 0;
       left: 0;
       z-index: 50;
+      cursor: pointer;
     }
 
   </style>
@@ -109,35 +109,51 @@ document.getElementById('upload').addEventListener('change', function(e) {
 
 async function renderPageToCanvas(page) {
     const container = document.getElementById("pdf-container");
+    
+    // Create wrapper for positioning
+    const pageWrapper = document.createElement("div");
+    pageWrapper.className = "page-wrapper";
+    
+    // Create main canvas for PDF rendering
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     const viewport = page.getViewport({ scale: 1.5 });
-    canvas.height = viewport.height;
     canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    canvas.style.display = "block";
     
     // Create highlight overlay canvas
     const highlightCanvas = document.createElement("canvas");
     highlightCanvas.className = "highlight-overlay";
-    highlightCanvas.width = canvas.width;
-    highlightCanvas.height = canvas.height;
+    highlightCanvas.width = viewport.width;
+    highlightCanvas.height = viewport.height;
     
-    container.appendChild(canvas);
-    container.appendChild(highlightCanvas);
+    pageWrapper.appendChild(canvas);
+    pageWrapper.appendChild(highlightCanvas);
+    container.appendChild(pageWrapper);
     
+    // Render PDF to canvas
     await page.render({
         canvasContext: ctx,
         viewport: viewport
     }).promise;
     
+    console.log("📄 Page rendered with viewport:", viewport.width, "x", viewport.height);
+    
     // Extract text
     const textContent = await page.getTextContent();
     const textItems = textContent.items;
     
+    console.log("📝 Found text items:", textItems.length);
+    
     canvas.addEventListener("click", function(e) {
-        const x = e.offsetX;
-        const y = e.offsetY;
-        console.log("🖱️ Clicked at position:", { x, y });
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+        const y = (e.clientY - rect.top) * (canvas.height / rect.height);
         
+        console.log("🖱️ Clicked at canvas position:", { x, y });
+        
+        let foundWord = false;
         textItems.forEach(item => {
             const tx = item.transform[4];
             const ty = item.transform[5];
@@ -146,29 +162,40 @@ async function renderPageToCanvas(page) {
             const canvasYBottom = viewport.height - ty;
             const canvasYTop = canvasYBottom + height;
             
+            console.log(`Checking word "${item.str}": x[${tx}-${tx + width}], y[${canvasYBottom}-${canvasYTop}]`);
+            
             if (
                 x >= tx &&
                 x <= tx + width &&
                 y >= canvasYBottom &&
                 y <= canvasYTop
             ) {
+                foundWord = true;
                 console.log("✨ Word detected:", item.str);
                 
                 // Clear previous highlights
                 const hCtx = highlightCanvas.getContext("2d");
                 hCtx.clearRect(0, 0, highlightCanvas.width, highlightCanvas.height);
                 
-                // Draw blue highlight
+                // Draw blue highlight box
+                const highlightX = tx;
+                const highlightY = viewport.height - canvasYTop;
                 hCtx.fillStyle = "rgba(0, 150, 255, 0.3)";
-                hCtx.fillRect(tx, viewport.height - canvasYTop, width, height);
-                hCtx.strokeStyle = "rgba(0, 150, 255, 0.8)";
-                hCtx.lineWidth = 2;
-                hCtx.strokeRect(tx, viewport.height - canvasYTop, width, height);
+                hCtx.fillRect(highlightX, highlightY, width, height);
+                hCtx.strokeStyle = "rgba(0, 150, 255, 0.9)";
+                hCtx.lineWidth = 3;
+                hCtx.strokeRect(highlightX, highlightY, width, height);
+                
+                console.log("🎨 Blue highlight drawn at:", { highlightX, highlightY, width, height });
                 
                 // Fetch definition
                 showMeaning(item.str);
             }
         });
+        
+        if (!foundWord) {
+            console.log("⚠️ No word found at clicked position");
+        }
     });
 }
 
