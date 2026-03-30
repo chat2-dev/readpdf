@@ -79,9 +79,14 @@
 <h3>Upload PDF</h3>
 <input type="file" id="upload" accept="application/pdf">
 
+<button id="toggle-view">Show Extracted Text</button>
 
   <div id="pdf-container">
   <canvas id="pdf-render"></canvas>
+</div>
+
+<div id="text-view" style="display:none;">
+  <textarea id="extracted-textarea" readonly style="width:100%; height:80vh;"></textarea>
 </div>
 
 <div id="popup"></div>
@@ -93,6 +98,7 @@
   let pdfDoc = null; 
 let currentPDFData = null;
 let pageNum = 1;
+let extractedText = '';
 
   let db;
 
@@ -126,6 +132,23 @@ document.getElementById('upload').addEventListener('change', function(e) {
 };
 
   fileReader.readAsArrayBuffer(file);
+});
+
+// Toggle view button
+document.getElementById('toggle-view').addEventListener('click', function() {
+  const pdfContainer = document.getElementById('pdf-container');
+  const textView = document.getElementById('text-view');
+  const textarea = document.getElementById('extracted-textarea');
+  if (pdfContainer.style.display !== 'none') {
+    pdfContainer.style.display = 'none';
+    textView.style.display = 'block';
+    textarea.value = extractedText;
+    this.textContent = 'Show PDF';
+  } else {
+    pdfContainer.style.display = 'block';
+    textView.style.display = 'none';
+    this.textContent = 'Show Extracted Text';
+  }
 });
 
 // render
@@ -164,6 +187,11 @@ async function renderPageToCanvas(page) {
 
     const textContent = await page.getTextContent();
 
+    // Collect extracted text
+    let pageText = '';
+    textContent.items.forEach(item => pageText += item.str + ' ');
+    extractedText += pageText + '\n\n';
+
     // Render text layer for word alignment and click targets
     await pdfjsLib.renderTextLayer({
         textContent: textContent,
@@ -194,6 +222,10 @@ async function renderPageToCanvas(page) {
     // If no text spans (image-based PDF), fallback to OCR
     if (wordSpans.length === 0) {
         const imageTextItems = await attemptOCR(canvas, viewport);
+        // Collect OCR text
+        let ocrText = '';
+        imageTextItems.forEach(item => ocrText += item.str + ' ');
+        extractedText += ocrText + '\n\n';
         setupCanvasClickHandler(canvas, null, viewport, imageTextItems);
     }
 }
@@ -342,9 +374,19 @@ function setupCanvasClickHandler(canvas, highlightCanvas, viewport, textItems) {
     });
 }
 
+async function attemptOCR(canvas, viewport) {
+  showOCRStatus("Running OCR...", 0);
+  const { data: { lines } } = await Tesseract.recognize(canvas, 'eng', {
+    logger: m => console.log(m)
+  });
+  showOCRStatus("OCR Complete", 2000);
+  return parseOCRResults(lines, viewport);
+}
+
 async function renderAllPages() {
   const container = document.getElementById("pdf-container");
   const renderedPages = [];
+  extractedText = ''; // Clear previous text
   // Render pages sequentially
   const renderPage = async (index) => {
     if (index < pdfDoc.numPages) {
