@@ -86,7 +86,7 @@
 </div>
 
 <div id="text-view" style="display:none;">
-  <pre id="extracted-textarea" style="width:100%; height:80vh; white-space: pre-wrap; font-family: monospace; border:1px solid #ccc; padding:10px; overflow-y: scroll;"></pre>
+  <pre id="extracted-textarea" style="width:100%; height:80vh; white-space: pre-wrap; font-family: monospace; border:1px solid #ccc; padding:10px; overflow-y: scroll; line-height: 1.6;"></pre>
 </div>
 
 <div id="popup"></div>
@@ -198,7 +198,7 @@ async function renderPageToCanvas(page, pageNumber) {
     });
     // Sort lines by y descending (top to bottom)
     Object.keys(lines).sort((a,b) => b - a).forEach(y => {
-      pageText += lines[y].join(' ') + '\n';
+      pageText += lines[y].join(' ') + '\n\n';
     });
     extractedText += `--- Page ${pageNumber} ---\n${pageText}\n\n`;
 
@@ -243,7 +243,7 @@ async function renderPageToCanvas(page, pageNumber) {
         });
         // Sort lines by y descending
         Object.keys(ocrLines).sort((a,b) => b - a).forEach(y => {
-          ocrText += ocrLines[y].join(' ') + '\n';
+          ocrText += ocrLines[y].join(' ') + '\n\n';
         });
         extractedText += `--- Page ${pageNumber} (OCR) ---\n${ocrText}\n\n`;
         setupCanvasClickHandler(canvas, null, viewport, imageTextItems);
